@@ -7,6 +7,7 @@ A personal archiver for two furry art sites - [e621](https://e621.net) and [FurA
 - Pulls new posts from configurable e621 tag searches.
 - Pulls new submissions from three FurAffinity channels: specific artists' galleries, the Watchlist (submissions from everyone you follow), and keyword searches.
 - Deduplicates across runs using a SQLite store keyed on `(source, id)`, so re-runs only fetch what's new.
+- Deduplicates by content using a SQLite store of SHA-256 file hashes: a download whose bytes are identical to a file already in the gallery (a cross-post or re-upload, even under a different id or source) is discarded instead of saved. Matching is exact-hash only, so distinct alternate versions ("alts") are never merged.
 - Applies a shared blacklist (tags / keywords) across every module.
 - Registers a Windows scheduled task on save, so runs happen on a configurable interval in the background.
 - Includes a local HTTP gallery (launched from the config GUI) that lists both sources together in an e621-styled grid with pagination, a lightbox, and per-source filtering.
@@ -57,9 +58,20 @@ The server is loopback-only, nothing goes external.
 ## Data layout
 
 - Files: `<output_dir>\<id>.<ext>` for e621, `<output_dir>\fa_<id>.<ext>` for FurAffinity.
-- Dedup DB: `%APPDATA%\FurScraper\seen.db` (SQLite; tables `seen(source, post_id)` and `search_state(source, query)`).
+- Dedup DB: `%APPDATA%\FurScraper\seen.db` (SQLite; tables `seen(source, post_id)`, `search_state(source, query)`, and `file_hash(sha256, ...)` for content dedup).
 - Log: `%APPDATA%\FurScraper\scraper.log`.
 - Config: `%APPDATA%\FurScraper\config.json`.
+
+### Cleaning up an existing gallery
+
+`dedup_backfill.py` finds byte-for-byte duplicate files already sitting in the output folder, keeps the oldest copy of each, deletes the rest, and seeds the hash store so the scraper recognizes everything you already have. It defaults to a dry run that changes nothing:
+
+```
+python dedup_backfill.py            # report what would be deleted
+python dedup_backfill.py --apply    # actually delete duplicates and seed the hash store
+```
+
+Exact-hash only, so alternate versions are never deleted.
 
 ## Considerations
 

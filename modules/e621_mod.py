@@ -3,7 +3,7 @@ import time
 import requests
 from requests.auth import HTTPBasicAuth
 
-from .base import Module
+from .base import Module, save_download
 
 API_URL = "https://e621.net/posts.json"
 UA_TEMPLATE = "FurScraper/1.0 (by {username} on e621)"
@@ -79,11 +79,12 @@ class E621Module(Module):
                         time.sleep(REQ_DELAY)
                         dl = requests.get(url, headers=headers, auth=auth, timeout=60)
                         dl.raise_for_status()
-                        target.write_bytes(dl.content)
+                        saved = save_download(ctx, SOURCE, pid, dl.content, target)
                         ctx.seen.mark_seen(SOURCE, pid)
                         ctx.seen.commit()
-                        total_new += 1
-                        found += 1
+                        if saved:
+                            total_new += 1
+                            found += 1
                     except Exception as e:
                         ctx.logger.error(f"e621 download failed for {pid}: {e}")
                         total_errs += 1

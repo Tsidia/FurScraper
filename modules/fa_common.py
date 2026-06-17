@@ -3,6 +3,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from .base import save_download
+
 FAEXPORT_BASE = "https://faexport.spangle.org.uk"
 FA_REQ_DELAY = 1.1
 SOURCE = "fa"
@@ -97,10 +99,10 @@ def process_submission(sub_id, client, ctx):
         time.sleep(FA_REQ_DELAY)
         r = requests.get(url, headers={"User-Agent": UA}, timeout=60)
         r.raise_for_status()
-        target.write_bytes(r.content)
+        saved = save_download(ctx, SOURCE, sid, r.content, target)
         ctx.seen.mark_seen(SOURCE, sid)
         ctx.seen.commit()
-        return True, False
+        return saved, False
     except Exception as e:
         ctx.logger.error(f"FA download failed for {sid}: {e}")
         return False, True

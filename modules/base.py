@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -45,6 +46,10 @@ class SeenStore:
         else:
             self._create_tables()
             c.commit()
+        # file_hash is independent of the seen/search_state migration above and
+        # may be missing on any older DB; ensure it exists unconditionally.
+        self._ensure_hash_table()
+        c.commit()
 
     def _create_tables(self):
         c = self.conn
@@ -63,6 +68,37 @@ class SeenStore:
                 initialized INTEGER,
                 PRIMARY KEY (source, query)
             )"""
+        )
+        self._ensure_hash_table()
+
+    def _ensure_hash_table(self):
+        # Content-addressed store of downloaded files. Keyed on the SHA-256 of the
+        # raw bytes, so two rows can only collide when the files are byte-for-byte
+        # identical; visually-similar alternate versions never share a hash.
+        self.conn.execute(
+            """CREATE TABLE IF NOT EXISTS file_hash (
+                sha256 TEXT PRIMARY KEY,
+                source TEXT,
+                post_id TEXT,
+                path TEXT,
+                size INTEGER,
+                hashed_at INTEGER
+            )"""
+        )
+
+    def hash_path(self, sha256):
+        """Return the stored filename for this content hash, or None if unseen."""
+        cur = self.conn.execute(
+            "SELECT path FROM file_hash WHERE sha256=?", (sha256,)
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+    def record_hash(self, sha256, source, post_id, path, size):
+        self.conn.execute(
+            "INSERT OR IGNORE INTO file_hash(sha256, source, post_id, path, size, hashed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (sha256, source, str(post_id), path, int(size), int(time.time())),
         )
 
     def is_seen(self, source, post_id):
@@ -106,6 +142,25 @@ class Context:
     out_dir: Any
     blacklist: List[str] = field(default_factory=list)
     fa_auth: dict = field(default_factory=dict)
+
+
+def save_download(ctx, source, post_id, data, target):
+    """Write `data` to `target`, unless a byte-for-byte identical file already exists.
+
+    Returns True if a new file was written, False if the content was a duplicate of
+    something already in the gallery (in which case nothing is written). Matching is
+    exact-hash only, so distinct alternate versions are never treated as duplicates.
+    """
+    sha = hashlib.sha256(data).hexdigest()
+    existing = ctx.seen.hash_path(sha)
+    if existing is not None:
+        ctx.logger.info(
+            f"{source} {post_id}: identical content to {existing}, skipped"
+        )
+        return False
+    target.write_bytes(data)
+    ctx.seen.record_hash(sha, source, post_id, target.name, len(data))
+    return True
 
 
 class Module:
