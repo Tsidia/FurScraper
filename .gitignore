@@ -7,3 +7,7 @@ venv/
 .vscode/
 *.log
 *.db
+
+# PyInstaller output
+build/
+dist/

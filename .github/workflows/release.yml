@@ -1,0 +1,67 @@
+name: Build and release
+
+# Tag a commit to cut a release:
+#   git tag v1.0.0 && git push origin v1.0.0
+# Also runnable by hand from the Actions tab, which builds and uploads the exe
+# as a workflow artifact without publishing a release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller --clean --noconfirm furscraper.spec
+
+      - name: Smoke-test the executable
+        # The exe is windowed, so it cannot report to stdout. Confirm it at
+        # least starts, loads config and reaches the scraper path without
+        # crashing: --run against a config with no modules enabled exits 0
+        # quickly and touches no network.
+        run: |
+          if (-not (Test-Path dist\FurScraper.exe)) { throw "exe was not produced" }
+          $size = (Get-Item dist\FurScraper.exe).Length
+          Write-Host "Built dist\FurScraper.exe ($([math]::Round($size/1MB,1)) MB)"
+          if ($size -lt 5MB) { throw "exe is suspiciously small: $size bytes" }
+          # Never -Wait unbounded: a failure path could raise a modal dialog
+          # that nothing on a headless runner will ever dismiss.
+          $p = Start-Process dist\FurScraper.exe -ArgumentList '--run' -PassThru
+          if (-not $p.WaitForExit(120000)) {
+            $p.Kill()
+            throw "FurScraper.exe --run did not exit within 120s (stuck, possibly on a dialog)"
+          }
+          Write-Host "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "FurScraper.exe --run exited $($p.ExitCode)" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FurScraper-exe
+          path: dist/FurScraper.exe
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist\FurScraper.exe `
+            --title "FurScraper ${{ github.ref_name }}" `
+            --generate-notes
