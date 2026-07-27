@@ -28,7 +28,7 @@ Everything downstream of the fetch is shared: dedup, blacklist filtering, downlo
 
 ## Install
 
-**[Download FurScraper.exe from the latest release](https://github.com/Tsidia/FurScraper/releases/latest)** and double-click it. Nothing else to install: Python, tkinter and every dependency are inside the executable.
+**[Download FurScraper.exe](https://github.com/Tsidia/FurScraper/releases/latest/download/FurScraper.exe)** and double-click it. Nothing else to install: Python, tkinter and every dependency are inside the executable. That link always serves the newest build; [all releases are here](https://github.com/Tsidia/FurScraper/releases).
 
 Windows SmartScreen will warn you the first time, because the build is not code-signed. "More info" then "Run anyway".
 
