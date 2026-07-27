@@ -33,7 +33,7 @@ class FASearchModule(Module):
 
             while not stop:
                 try:
-                    items = client.search(query, page=page)
+                    items = client.search(query, page=page)  # date-desc, newest first
                 except Exception as e:
                     ctx.logger.error(
                         f"FA search failed for '{query}' page {page}: {e}"

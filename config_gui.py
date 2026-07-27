@@ -12,6 +12,7 @@ from common import load_config, save_config, APPDATA, LOG_PATH
 import scraper
 
 TASK_NAME = "FurScraper"
+FA_MODULE_KEYS = ("fa_artists", "fa_watchlist", "fa_search")
 
 
 def pythonw_path():
@@ -155,8 +156,11 @@ class App(tk.Tk):
         ttk.Label(
             f,
             text=(
-                "FurAffinity session cookies — required for mature content and for the Watchlist module.\n\n"
-                "How to get them:\n"
+                "FurAffinity session cookies — required by every FA module.\n\n"
+                "IMPORTANT: your FA account must use the Classic theme. FurScraper\n"
+                "cannot read the Modern layout at all. On FA go to Settings →\n"
+                "Site Preferences and set the theme to Classic.\n\n"
+                "How to get the cookies:\n"
                 "  1. Log into furaffinity.net in your browser.\n"
                 "  2. Open DevTools (F12) → Application/Storage → Cookies → www.furaffinity.net\n"
                 "  3. Copy the VALUES of the cookies named 'a' and 'b' and paste them below.\n\n"
@@ -314,11 +318,21 @@ class App(tk.Tk):
                     "The e621 module is enabled but username or API key is empty.",
                 )
                 return False
-        if mods["fa_watchlist"]["enabled"]:
+        # Every FA module needs cookies, not just the Watchlist: FurScraper talks
+        # to FA directly, so each request carries the user's own session.
+        fa_on = [k for k in FA_MODULE_KEYS if mods.get(k, {}).get("enabled")]
+        if fa_on:
             if not cfg["fa_auth"]["cookie_a"] or not cfg["fa_auth"]["cookie_b"]:
+                labels = {
+                    "fa_artists": "FA Artists",
+                    "fa_watchlist": "FA Watchlist",
+                    "fa_search": "FA Search",
+                }
                 messagebox.showwarning(
                     "FA cookies missing",
-                    "FA Watchlist is enabled but FA cookies are empty. Fill in the FA Auth tab.",
+                    f"{', '.join(labels[k] for k in fa_on)} enabled, but the FA "
+                    "cookies are empty.\n\nYour cookies are what authenticate "
+                    "every request to FurAffinity. Fill in the FA Auth tab.",
                 )
                 return False
         if not any(m.get("enabled") for m in mods.values()):
@@ -352,10 +366,15 @@ class App(tk.Tk):
         )
 
     def _register_task(self, interval_minutes):
-        pw = pythonw_path()
-        script = Path(__file__).resolve().parent / "scraper.py"
-        # Point the task at pythonw.exe directly — no .bat, no cmd.exe console window.
-        tr_value = f'"{pw}" "{script}"'
+        # Packaged builds have no interpreter or .py files to point at: the exe
+        # re-invokes itself with --run. From source we target pythonw.exe
+        # directly, so no .bat and no cmd.exe console window.
+        if getattr(sys, "frozen", False):
+            tr_value = f'"{Path(sys.executable).resolve()}" --run'
+        else:
+            pw = pythonw_path()
+            script = Path(__file__).resolve().parent / "scraper.py"
+            tr_value = f'"{pw}" "{script}"'
         cmd = [
             "schtasks", "/Create", "/F",
             "/TN", TASK_NAME,
@@ -398,8 +417,12 @@ class App(tk.Tk):
             )
             logger = logging.getLogger()
             logger.info("=== Manual run start ===")
+
+            def progress(msg):
+                self.after(0, lambda: self.status.set(msg))
+
             try:
-                new, errs, mod_failures = scraper.run_all(cfg, logger)
+                new, errs, mod_failures = scraper.run_all(cfg, logger, progress=progress)
                 logger.info(
                     f"Manual run done: {new} new, {errs} errors, "
                     f"{len(mod_failures)} module failures"
@@ -428,5 +451,9 @@ class App(tk.Tk):
             messagebox.showinfo("Done", summary)
 
 
-if __name__ == "__main__":
+def main():
     App().mainloop()
+
+
+if __name__ == "__main__":
+    main()

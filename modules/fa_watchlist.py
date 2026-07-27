@@ -14,18 +14,12 @@ class FAWatchlistModule(Module):
             )
         client = make_client(ctx)
         try:
-            data = client.notifications_submissions()
+            data = client.new_submissions()
         except Exception as e:
             ctx.logger.error(f"FA watchlist fetch failed: {e}")
             raise
 
-        # faexport may return the list under different keys depending on version;
-        # handle both shapes.
-        items = (
-            data.get("new_submissions")
-            or data.get("submissions")
-            or (data if isinstance(data, list) else [])
-        )
+        items = data.get("new_submissions") or []
         ctx.logger.info(f"FA watchlist: {len(items)} in queue")
 
         total_new = 0

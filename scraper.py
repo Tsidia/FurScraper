@@ -29,7 +29,7 @@ def notify_failure(msg):
         pass
 
 
-def run_all(cfg, logger):
+def run_all(cfg, logger, progress=None):
     """Run every enabled module. Returns (new_count, download_errors, module_failures)."""
     out_dir = Path(cfg["output_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -44,11 +44,14 @@ def run_all(cfg, logger):
     total_new = 0
     total_errs = 0
     mod_failures = []
+
     try:
         for cls in MODULES:
             mod_cfg = cfg["modules"].get(cls.KEY, {})
             if not mod_cfg.get("enabled", False):
                 continue
+            if progress:
+                progress(f"Running {cls.LABEL}…")
             logger.info(f"--- Module: {cls.LABEL} ---")
             try:
                 new, errs = cls().run(mod_cfg, ctx)
