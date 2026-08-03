@@ -382,6 +382,30 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 #save-msg { font-size: 13px; color: var(--text-dim); }
 #save-msg.bad { color: var(--bad); white-space: pre-line; }
 
+/* ---------- network access / pairing ---------- */
+
+#net-card.off .card-head { opacity: 0.62; }
+
+.net-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pairing {
+  display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+/* QR modules must sit on white to scan reliably against the dark theme. */
+.qr-box { background: #fff; padding: 10px; border-radius: 6px; flex: none; }
+.qr-box svg { display: block; width: 172px; height: 172px; }
+.qr-box:empty { display: none; }
+
+.pair-text { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
+.pair-code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 30px; font-weight: 600; letter-spacing: 0.22em;
+  color: var(--accent);
+}
+
 /* ---------- toasts ---------- */
 
 .toasts { position: fixed; right: 18px; bottom: 76px; z-index: 120; display: flex; flex-direction: column; gap: 8px; }

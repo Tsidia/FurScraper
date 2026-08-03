@@ -13,6 +13,8 @@ LOG_PATH = APPDATA / "scraper.log"
 # The web UI's access key, kept out of config.json so that exporting or sharing
 # a config never leaks it, and so rewriting config cannot lose it.
 UI_KEY_PATH = APPDATA / "ui.key"
+# Paired-device session tokens, same reasoning: never part of config.json.
+SESSIONS_PATH = APPDATA / "sessions.json"
 
 DEFAULT_CONFIG = {
     "output_dir": str(Path.home() / "Pictures" / "FurScraper"),
@@ -25,6 +27,14 @@ DEFAULT_CONFIG = {
     # bookmark always works. Off means the UI only exists while you have it
     # open, and closes with the tab.
     "keep_ui_running": True,
+    # Off means the server binds loopback only, exactly as it always has. On
+    # means it also listens on the LAN so phones and other computers can reach
+    # the gallery; those devices authenticate by pairing, never by default.
+    "lan_enabled": False,
+    # The mDNS hostname the Tsidia hub advertises: <hub_name>.local. One name
+    # serves every Tsidia app on this machine, so it is a machine-level choice
+    # that happens to live in each app's config.
+    "hub_name": "tsidia",
     "blacklist": [],
     "fa_auth": {"cookie_a": "", "cookie_b": ""},
     "modules": {

@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FurScraper</title>
-<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
-<link rel="stylesheet" href="/static/app.css">
+<!-- Relative URLs throughout: the page is served both at / (direct) and under
+     /furscraper/ (through the Tsidia hub), and must work at either. -->
+<link rel="icon" type="image/svg+xml" href="static/icon.svg">
+<link rel="stylesheet" href="static/app.css">
 </head>
 <body>
 <div id="boot" class="boot">Loading…</div>
@@ -13,7 +15,7 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="brand">
-      <img class="mark" src="/static/icon.svg" alt="">
+      <img class="mark" src="static/icon.svg" alt="">
       <span>FurScraper</span>
     </div>
     <nav class="tabs" id="tabs">
@@ -251,10 +253,50 @@
             </label>
           </div>
           <p class="hint">
-            Changing the port takes effect next launch, and changes the address
-            above, so re-bookmark it if you do. It is only ever reachable from
-            this computer.
+            Changing the port moves the interface as soon as you save and
+            changes the address above, so re-bookmark it if you do.
           </p>
+        </div>
+      </div>
+
+      <div class="card" id="net-card">
+        <div class="card-head">
+          <div>
+            <h2>Network access</h2>
+            <p class="muted">Browse your gallery from a phone or another computer on this network.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="lan-enabled"><span></span></label>
+        </div>
+        <div class="card-body" id="net-body">
+          <div class="field-row">
+            <label class="field narrow">
+              <span>Network name</span>
+              <input type="text" id="hub-name" spellcheck="false" autocomplete="off">
+            </label>
+          </div>
+          <p class="hint">
+            Other devices reach this computer at <code>http://&lt;name&gt;.local/furscraper/</code>.
+            One Tsidia address serves every Tsidia app on this machine; the home
+            screen at <code>http://&lt;name&gt;.local/</code> lists them all.
+            Windows only allows this on networks marked Private.
+          </p>
+          <p class="hint" id="net-hint" hidden></p>
+          <dl class="paths" id="net-addresses"></dl>
+          <div class="callout warn" id="net-warning" hidden></div>
+          <div class="net-actions">
+            <button class="btn" id="pair-btn">Pair a device</button>
+            <button class="btn ghost" id="forget-btn">Forget paired devices</button>
+            <button class="btn ghost" id="fw-btn" hidden>Allow through firewall</button>
+          </div>
+          <div class="pairing" id="pair-box" hidden>
+            <div class="qr-box" id="qr-box"></div>
+            <div class="pair-text">
+              <p>Scan with the device's camera, or open
+                <code id="pair-url"></code> on it and enter this code:</p>
+              <div class="pair-code" id="pair-code"></div>
+              <p class="hint">The code works once and expires after ten minutes.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -290,6 +332,6 @@
 <div class="toasts" id="toasts"></div>
 
 <script>window.__TOKEN__ = "__TOKEN_VALUE__";</script>
-<script src="/static/app.js"></script>
+<script src="static/app.js"></script>
 </body>
 </html>

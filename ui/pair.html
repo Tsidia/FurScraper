@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pair with FurScraper</title>
+<link rel="icon" type="image/svg+xml" href="static/icon.svg">
+<link rel="stylesheet" href="static/app.css">
+<style>
+  /* Page-specific bits kept here: app.css is shared with the main UI. */
+  .pair-page { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .pair-card { width: min(430px, 100%); }
+  .pair-card .card-body { gap: 12px; }
+  .pair-head { display: flex; align-items: center; gap: 10px; }
+  .pair-head img { width: 26px; height: 26px; border-radius: 6px; }
+  .code-input {
+    text-align: center; font-size: 24px; letter-spacing: 0.35em;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  .pair-error { color: var(--bad); font-size: 13px; }
+  .pair-error:empty { display: none; }
+</style>
+</head>
+<body>
+<div class="pair-page">
+  <form class="card pair-card" id="form">
+    <div class="card-head">
+      <div class="pair-head">
+        <img src="static/icon.svg" alt="">
+        <h2>Pair with FurScraper</h2>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="muted">
+        This device is not paired yet. On the computer running FurScraper, open
+        Settings, click <strong>Pair a device</strong>, and enter the six-digit
+        code here (or scan the QR code instead).
+      </p>
+      <input class="code-input" id="code" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="6" placeholder="······" autofocus>
+      <div class="pair-error" id="error">__ERROR__</div>
+      <button class="btn primary big" type="submit">Connect</button>
+      <p class="hint">
+        Using the computer FurScraper runs on? Just launch FurScraper; it opens
+        with access already granted.
+      </p>
+    </div>
+  </form>
+</div>
+<script>
+  const form = document.getElementById("form");
+  const code = document.getElementById("code");
+  const error = document.getElementById("error");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    error.textContent = "";
+    try {
+      const res = await fetch("api/pair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.value.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        location.replace("./");
+      } else {
+        error.textContent = data.error || "Pairing failed. Try again.";
+        code.select();
+      }
+    } catch (_) {
+      error.textContent = "Could not reach FurScraper. Is it still running?";
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # FurScraper
 
-A personal archiver for two furry art sites - [e621](https://e621.net) and [FurAffinity](https://www.furaffinity.net) with a Windows GUI for configuration, a scheduled background runner, and a local web gallery that presents posts from both sources in a single browsable view.
+A personal archiver for two furry art sites - [e621](https://e621.net) and [FurAffinity](https://www.furaffinity.net)
 Available for download at: **[FurScraper.exe](https://github.com/Tsidia/FurScraper/releases/latest/download/FurScraper.exe)**
 
 ## What it does
@@ -10,6 +10,7 @@ Available for download at: **[FurScraper.exe](https://github.com/Tsidia/FurScrap
 - Applies universal blacklist.
 - Stores all data in a local gallery.
 - Works silently in the background via windows scheduled tasks.
+- Optionally serves the gallery to other devices on your home network, under a friendly address.
 
 ## Install
 
@@ -26,7 +27,7 @@ Which produces `dist/FurScraper.exe`. The packaged app re-invokes itself as `Fur
 
 Config is saved to `%APPDATA%\FurScraper\config.json`. **Save & schedule** writes it and (re-)registers the Windows task.
 
-Gallery lives in your browser under a stable link you can bookmark. All data remains on your local device. 
+Gallery lives in your browser under a stable link you can bookmark. By default all data remains on your device. Access from other devices on your local network available in the settings.
 
 ## Data layout
 
@@ -34,6 +35,8 @@ Gallery lives in your browser under a stable link you can bookmark. All data rem
 - Dedup DB: `%APPDATA%\FurScraper\seen.db` (SQLite; tables `seen(source, post_id)`, `search_state(source, query)`, and `file_hash(sha256, ...)` for content dedup).
 - Log: `%APPDATA%\FurScraper\scraper.log`.
 - Config: `%APPDATA%\FurScraper\config.json`.
+- Paired devices: `%APPDATA%\FurScraper\sessions.json` (tokens only, revocable in Settings).
+- Tsidia hub app manifests: `%APPDATA%\Tsidia\apps\`.
 
 ## Two scraping philosophies
 

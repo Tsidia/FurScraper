@@ -22,6 +22,9 @@ a = Analysis(
         'scheduler',
         'gallery',
         'dialogs',
+        'netutil',
+        'pairing',
+        'tsidia_hub',
         'modules.base',
         'modules.e621_mod',
         'modules.fa_artists',
@@ -29,6 +32,12 @@ a = Analysis(
         'modules.fa_search',
         'modules.fa_site',
         'modules.fa_watchlist',
+        # Imported inside functions (optional at runtime), which the static
+        # analyser can miss; zeroconf needs ifaddr at runtime.
+        'zeroconf',
+        'ifaddr',
+        'qrcode',
+        'qrcode.image.svg',
     ],
     hookspath=[],
     hooksconfig={},

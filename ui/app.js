@@ -1,4 +1,8 @@
-/* FurScraper UI. Vanilla, no build step. */
+/* FurScraper UI. Vanilla, no build step.
+
+   All URLs are relative: the page is served both at / (direct) and under
+   /furscraper/ (through the Tsidia hub), and relative paths resolve correctly
+   at either. */
 
 const TOKEN = window.__TOKEN__;
 const $ = (id) => document.getElementById(id);
@@ -57,8 +61,11 @@ function fillForm(cfg) {
   $("keep-ui").checked = cfg.keep_ui_running !== false;
   $("output-dir").value = cfg.output_dir || "";
   $("blacklist").value = (cfg.blacklist || []).join("\n");
+  $("lan-enabled").checked = !!cfg.lan_enabled;
+  $("hub-name").value = cfg.hub_name || "tsidia";
 
   document.querySelectorAll(".source").forEach(syncSourceCard);
+  syncNetCard();
 }
 
 function readForm() {
@@ -67,6 +74,8 @@ function readForm() {
     interval_minutes: parseInt($("interval").value, 10) || 0,
     ui_port: parseInt($("ui-port").value, 10) || 47821,
     keep_ui_running: $("keep-ui").checked,
+    lan_enabled: $("lan-enabled").checked,
+    hub_name: $("hub-name").value.trim().toLowerCase() || "tsidia",
     blacklist: lines($("blacklist").value),
     fa_auth: {
       cookie_a: $("cookie-a").value.trim(),
@@ -95,6 +104,12 @@ function readForm() {
 function syncSourceCard(card) {
   const key = card.dataset.module;
   card.classList.toggle("off", !$(`${key}-enabled`).checked);
+}
+
+function syncNetCard() {
+  const on = $("lan-enabled").checked;
+  $("net-card").classList.toggle("off", !on);
+  $("net-body").hidden = !on;
 }
 
 function markDirty() {
@@ -158,6 +173,81 @@ function renderDashboard() {
     : $("keep-ui").checked
       ? "Takes effect once you save, which registers the log-in trigger."
       : "Off. The bookmark only works while FurScraper is open, and it closes with the tab.";
+
+  renderNetwork();
+}
+
+const FIREWALL_TEXT = {
+  pending: "Waiting for Windows Firewall permission. Watch for the prompt.",
+  missing: "Windows Firewall has no rule for FurScraper yet, so other devices " +
+           "will be blocked. Click 'Allow through firewall'.",
+  declined: "The firewall prompt was declined, so other devices are blocked. " +
+            "Click 'Allow through firewall' to try again.",
+  failed: "The firewall rule could not be added. Click 'Allow through firewall' " +
+          "to retry, or add an inbound rule for FurScraper yourself.",
+  unknown: "Could not check Windows Firewall. If other devices cannot connect, " +
+           "click 'Allow through firewall'.",
+};
+
+function renderNetwork() {
+  const net = state.network || { lan_enabled: false };
+  const saved = net.lan_enabled;
+  const dl = $("net-addresses");
+  const hint = $("net-hint");
+  const warn = $("net-warning");
+
+  hint.hidden = !($("lan-enabled").checked && !saved);
+  hint.textContent = hint.hidden ? "" : "Save to turn on network access.";
+  $("pair-btn").disabled = !saved;
+  $("forget-btn").disabled = !saved;
+
+  dl.innerHTML = "";
+  const warnings = [];
+  if (saved) {
+    const add = (dt, dd) => {
+      const t = document.createElement("dt");
+      t.textContent = dt;
+      const d = document.createElement("dd");
+      d.textContent = dd;
+      dl.append(t, d);
+    };
+    if (net.hub_url) add("Tsidia address", net.hub_url);
+    (net.direct_urls || []).forEach((u) => add("Direct address", u));
+    add("Paired devices", String(net.paired || 0));
+
+    if (net.firewall && net.firewall !== "ok") warnings.push(FIREWALL_TEXT[net.firewall] || "");
+    if (net.hub && net.hub.warning) warnings.push(net.hub.warning);
+    if (net.hub && net.hub.role === "leader" && net.hub.mdns === false) {
+      warnings.push("The .local name could not be advertised on this network; " +
+                    "use the direct address or the QR code instead.");
+    }
+  }
+  warn.hidden = !warnings.length;
+  warn.textContent = warnings.join(" ");
+  $("fw-btn").hidden = !(saved && net.firewall && !["ok", "pending"].includes(net.firewall));
+  if (!saved) $("pair-box").hidden = true;
+}
+
+async function pairDevice() {
+  const { ok, data } = await api("api/pair/new", { method: "POST" });
+  if (!ok) {
+    ((data && data.problems) || ["Could not start pairing."]).forEach((p) => toast(p, "bad"));
+    return;
+  }
+  $("pair-code").textContent = data.code;
+  $("pair-url").textContent = data.friendly_url || data.qr_url || "";
+  $("pair-box").hidden = false;
+  $("qr-box").hidden = false;
+  $("qr-box").innerHTML = "";
+  try {
+    const res = await fetch("api/pair/qr.svg", {
+      headers: { "X-FurScraper-Token": TOKEN },
+    });
+    if (res.ok) $("qr-box").innerHTML = await res.text();
+    else $("qr-box").hidden = true;
+  } catch (_) {
+    $("qr-box").hidden = true;
+  }
 }
 
 function resultLine(kind, text) {
@@ -185,7 +275,7 @@ function relTime(ts) {
 /* ---------- gallery ---------- */
 
 async function loadGallery(page = 1) {
-  const { data } = await api(`/api/gallery?source=${gal.source}&page=${page}`);
+  const { data } = await api(`api/gallery?source=${gal.source}&page=${page}`);
   gal.entries = data.entries;
   gal.page = data.page;
   gal.pages = data.pages;
@@ -202,9 +292,9 @@ async function loadGallery(page = 1) {
     tile.className = "tile";
     tile.onclick = () => openLightbox(i);
     const media = e.is_video
-      ? `<video src="/media/${encodeURIComponent(e.name)}?k=${TOKEN}" preload="metadata" muted></video>
+      ? `<video src="media/${encodeURIComponent(e.name)}?k=${TOKEN}" preload="metadata" muted></video>
          <span class="vid">VIDEO</span>`
-      : `<img loading="lazy" src="/media/${encodeURIComponent(e.name)}?k=${TOKEN}" alt="">`;
+      : `<img loading="lazy" src="media/${encodeURIComponent(e.name)}?k=${TOKEN}" alt="">`;
     tile.innerHTML = `${media}<span class="badge ${e.source}">${e.source === "fa" ? "FA" : "e621"}</span>`;
     grid.appendChild(tile);
   });
@@ -240,7 +330,7 @@ function openLightbox(i) {
   const e = gal.entries[i];
   if (!e) return;
   lbIndex = i;
-  const src = `/media/${encodeURIComponent(e.name)}?k=${TOKEN}`;
+  const src = `media/${encodeURIComponent(e.name)}?k=${TOKEN}`;
   $("lb-stage").innerHTML = e.is_video
     ? `<video src="${src}" controls autoplay loop></video>`
     : `<img src="${src}" alt="">`;
@@ -265,7 +355,7 @@ function stepLightbox(d) {
 /* ---------- actions ---------- */
 
 async function refreshState() {
-  const { data } = await api("/api/state");
+  const { data } = await api("api/state");
   state = data;
   if (!config) {
     config = data.config;
@@ -278,7 +368,8 @@ async function refreshState() {
 
 async function save() {
   const cfg = readForm();
-  const { ok, data } = await api("/api/config", {
+  const prevPort = state && state.config ? state.config.ui_port : null;
+  const { ok, data } = await api("api/config", {
     method: "POST",
     body: JSON.stringify(cfg),
   });
@@ -291,13 +382,23 @@ async function save() {
   clearDirty();
   (data.problems || []).forEach((p) => toast(p, "bad"));
   if (!data.problems || !data.problems.length) toast("Saved and scheduled.", "good");
-  await refreshState();
+
+  // The server rebinds immediately on a port change. If this page is on the
+  // old port, follow it; behind the hub the address does not change at all.
+  if (prevPort && cfg.ui_port !== prevPort && String(location.port) === String(prevPort)) {
+    toast(`Moving to port ${cfg.ui_port}…`);
+    setTimeout(() => {
+      location.href = `${location.protocol}//${location.hostname}:${cfg.ui_port}/?k=${TOKEN}`;
+    }, 1500);
+    return true;
+  }
+  await refreshState().catch(() => {});  // a LAN toggle rebinds; poll recovers
   return true;
 }
 
 async function runNow() {
   const cfg = readForm();
-  const { ok, data } = await api("/api/run", {
+  const { ok, data } = await api("api/run", {
     method: "POST",
     body: JSON.stringify(cfg),
   });
@@ -311,7 +412,7 @@ async function runNow() {
 }
 
 async function refreshLog() {
-  const { data } = await api("/api/log?tail=300");
+  const { data } = await api("api/log?tail=300");
   const el = $("log");
   const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   el.textContent = data.lines.join("\n") || "Nothing logged yet.";
@@ -350,8 +451,25 @@ function wire() {
     el.addEventListener("change", markDirty);
   });
   document.querySelectorAll(".switch input").forEach((el) => {
-    el.addEventListener("change", () => syncSourceCard(el.closest(".source")));
+    el.addEventListener("change", () => {
+      const card = el.closest(".source");
+      if (card) syncSourceCard(card);
+    });
   });
+  $("lan-enabled").addEventListener("change", () => { syncNetCard(); renderNetwork(); });
+
+  $("pair-btn").onclick = pairDevice;
+  $("forget-btn").onclick = async () => {
+    if (!confirm("Forget every paired device? They will need to pair again.")) return;
+    const { ok, data } = await api("api/network/forget", { method: "POST" });
+    if (ok) toast(`Forgot ${data.forgotten} device${data.forgotten === 1 ? "" : "s"}.`, "good");
+    $("pair-box").hidden = true;
+    await refreshState().catch(() => {});
+  };
+  $("fw-btn").onclick = async () => {
+    await api("api/network/firewall", { method: "POST" });
+    toast("Watch for the Windows permission prompt.");
+  };
 
   $("save-btn").onclick = save;
   $("revert-btn").onclick = () => { fillForm(config); clearDirty(); };
@@ -365,17 +483,17 @@ function wire() {
     loadGallery(1);
   });
 
-  $("open-output").onclick = () => api("/api/open-folder", {
+  $("open-output").onclick = () => api("api/open-folder", {
     method: "POST", body: JSON.stringify({ what: "output" }),
   }).then(({ ok, data }) => { if (!ok) toast(data.problems[0], "bad"); });
 
-  $("open-appdata").onclick = () => api("/api/open-folder", {
+  $("open-appdata").onclick = () => api("api/open-folder", {
     method: "POST", body: JSON.stringify({ what: "appdata" }),
   });
 
   $("quit-btn").onclick = async () => {
     if (dirty && !confirm("You have unsaved changes. Quit anyway?")) return;
-    await api("/api/quit", { method: "POST" });
+    await api("api/quit", { method: "POST" });
     document.body.innerHTML =
       '<div class="boot">FurScraper has closed. You can close this tab.</div>';
   };
@@ -408,6 +526,15 @@ function wire() {
     $("boot").textContent = "Could not reach FurScraper. Close this tab and reopen the app.";
     return;
   }
+
+  // The server already granted a session cookie for whatever the query
+  // carried (key or pairing code), so drop it from the address bar: what is
+  // left is the clean, bookmarkable URL.
+  const params = new URLSearchParams(location.search);
+  if (params.has("k") || params.has("token") || params.has("pair")) {
+    history.replaceState(null, "", location.pathname);
+  }
+
   wire();
   await refreshLog();
   $("boot").hidden = true;
@@ -415,7 +542,7 @@ function wire() {
 
   // The tab is the app window: this keepalive is what tells the process we are
   // still here. Stop sending it and the app shuts itself down.
-  setInterval(() => api("/api/heartbeat", { method: "POST" }).catch(() => {}), 15000);
+  setInterval(() => api("api/heartbeat", { method: "POST" }).catch(() => {}), 15000);
 
   setInterval(async () => {
     const wasRunning = state && state.run.running;
