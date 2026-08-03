@@ -12,13 +12,16 @@ a = Analysis(
     ['furscraper.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    # The web UI's static assets, resolved at runtime via sys._MEIPASS.
+    datas=[('ui', 'ui')],
     # Modules reached only through the dispatcher or by name, which the static
     # analyser can miss.
     hiddenimports=[
-        'config_gui',
+        'webapp',
         'scraper',
+        'scheduler',
         'gallery',
+        'dialogs',
         'modules.base',
         'modules.e621_mod',
         'modules.fa_artists',
@@ -31,7 +34,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # Nothing here is used at runtime; dropping them keeps the binary smaller.
-    excludes=['pytest', 'setuptools', 'pip'],
+    # tkinter in particular is worth ~5MB and the UI no longer needs it.
+    excludes=['pytest', 'setuptools', 'pip', 'tkinter', '_tkinter'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -57,6 +61,7 @@ exe = EXE(
     # Windowed: no console flashes when the scheduled task fires. Startup errors
     # still surface, via the handler in furscraper.py.
     console=False,
+    icon='furscraper.ico',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

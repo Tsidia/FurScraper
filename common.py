@@ -10,10 +10,21 @@ APPDATA.mkdir(parents=True, exist_ok=True)
 CONFIG_PATH = APPDATA / "config.json"
 SEEN_DB_PATH = APPDATA / "seen.db"
 LOG_PATH = APPDATA / "scraper.log"
+# The web UI's access key, kept out of config.json so that exporting or sharing
+# a config never leaks it, and so rewriting config cannot lose it.
+UI_KEY_PATH = APPDATA / "ui.key"
 
 DEFAULT_CONFIG = {
     "output_dir": str(Path.home() / "Pictures" / "FurScraper"),
     "interval_minutes": 60,
+    # Fixed so the UI's address never changes and can be bookmarked. Below
+    # 49152, which is where Windows starts handing out ephemeral ports, so it
+    # will not be taken at random by something else.
+    "ui_port": 47821,
+    # Keep the interface reachable at that address from log-in onwards, so the
+    # bookmark always works. Off means the UI only exists while you have it
+    # open, and closes with the tab.
+    "keep_ui_running": True,
     "blacklist": [],
     "fa_auth": {"cookie_a": "", "cookie_b": ""},
     "modules": {

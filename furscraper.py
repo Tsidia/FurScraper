@@ -1,52 +1,48 @@
-"""Single entry point for the packaged executable.
+"""Entry point.
 
-    FurScraper.exe          opens the configuration window
-    FurScraper.exe --run    performs one scrape and exits
+    FurScraper.exe            opens the web UI in your browser
+    FurScraper.exe --run      performs one scrape and exits
+    FurScraper.exe --serve    starts the interface without opening a browser
 
-The scheduled task uses `--run`. When running from source the equivalents are
-`python config_gui.py` and `python scraper.py`, which still work unchanged.
+Two scheduled tasks use the latter two: --run on an interval to scrape, and
+--serve at log-in so the bookmarked address is always live. From source the
+equivalents are `python furscraper.py`, `--run` and `--serve`.
 
-Startup is wrapped so that an unexpected failure produces a dialog rather than
-nothing at all. A windowed build has no console, so without this an early crash
+Startup is wrapped so an unexpected failure produces a dialog rather than
+nothing at all: a windowed build has no console, so without this an early crash
 would look exactly like the program refusing to open.
 """
 import sys
+
+import dialogs
 
 
 def _fatal(exc):
     import traceback
 
     detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
-
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror(
-            "FurScraper failed to start",
-            f"{exc}\n\nDetails:\n{detail[-1500:]}",
-        )
-        root.destroy()
-    except Exception:
-        # No tkinter to complain with; fall back to stderr for source runs.
-        sys.stderr.write(detail)
+    dialogs.error("FurScraper failed to start", f"{exc}\n\n{detail[-1200:]}")
     sys.exit(1)
 
 
 def main():
+    args = sys.argv[1:]
     try:
-        if "--run" in sys.argv[1:]:
+        if "--run" in args:
             import scraper
 
             scraper.main()
-        else:
-            import config_gui
+        elif "--serve" in args:
+            import webapp
 
-            config_gui.main()
+            webapp.main(open_browser=False)
+        else:
+            import webapp
+
+            webapp.main()
     except SystemExit:
         raise
-    except BaseException as e:  # noqa: BLE001 - last resort, must not swallow silently
+    except BaseException as e:  # noqa: BLE001 - last resort, must not fail silently
         _fatal(e)
 
 

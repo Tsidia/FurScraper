@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import logging
 import traceback
@@ -14,19 +15,11 @@ MODULES = [E621Module, FAArtistsModule, FAWatchlistModule, FASearchModule]
 
 
 def notify_failure(msg):
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
+    import dialogs
 
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror(
-            "FurScraper",
-            f"Scraper run failed:\n\n{msg}\n\nSee log at:\n{LOG_PATH}",
-        )
-        root.destroy()
-    except Exception:
-        pass
+    dialogs.error(
+        "FurScraper", f"Scraper run failed:\n\n{msg}\n\nSee log at:\n{LOG_PATH}"
+    )
 
 
 def run_all(cfg, logger, progress=None):
@@ -66,6 +59,34 @@ def run_all(cfg, logger, progress=None):
     return total_new, total_errs, mod_failures
 
 
+def _ensure_ui_running(cfg, logger):
+    """Bring the interface back if it died, so the bookmark keeps working.
+
+    This runs on the scrape schedule, which makes the hourly task double as a
+    watchdog without needing any extra trigger.
+    """
+    if not cfg.get("keep_ui_running", True):
+        return
+    try:
+        import webapp
+
+        port = int(cfg.get("ui_port") or webapp.DEFAULT_PORT)
+        if webapp._ours(port):
+            return
+        cmd = (
+            [sys.executable, "--serve"]
+            if getattr(sys, "frozen", False)
+            else [sys.executable, str(Path(__file__).resolve().parent / "furscraper.py"), "--serve"]
+        )
+        flags = 0
+        for name in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP", "CREATE_NO_WINDOW"):
+            flags |= getattr(subprocess, name, 0)
+        subprocess.Popen(cmd, creationflags=flags, close_fds=True)
+        logger.info("interface was not running; started it")
+    except Exception as e:
+        logger.warning(f"could not restart the interface: {e}")
+
+
 def main():
     logging.basicConfig(
         filename=LOG_PATH,
@@ -76,6 +97,7 @@ def main():
     logger.info("=== Run start ===")
     try:
         cfg = load_config()
+        _ensure_ui_running(cfg, logger)
         new, errs, mod_failures = run_all(cfg, logger)
         logger.info(
             f"Run done: {new} new, {errs} errors, {len(mod_failures)} module failures"

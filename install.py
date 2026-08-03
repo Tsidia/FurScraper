@@ -37,17 +37,21 @@ def install_requirements():
     return True
 
 
-def check_tkinter():
-    step("Checking for tkinter (the GUI toolkit)")
+def check_imports():
+    """The UI is a browser page, so there is no GUI toolkit to check for; just
+    confirm the app's own imports resolve in this interpreter."""
+    step("Checking the app imports cleanly")
     r = subprocess.run(
-        [sys.executable, "-c", "import tkinter"], capture_output=True, text=True
+        [sys.executable, "-c", "import webapp, scraper"],
+        capture_output=True,
+        text=True,
+        cwd=str(HERE),
     )
     if r.returncode != 0:
-        print("  MISSING. The configuration window cannot open without it.")
-        print("  Reinstall Python from python.org with the 'tcl/tk and IDLE'")
-        print("  option ticked. The Microsoft Store build often omits it.")
+        print("  FAILED:")
+        print((r.stderr or r.stdout).strip())
         return False
-    print("  Present.")
+    print("  OK.")
     return True
 
 
@@ -70,7 +74,7 @@ def make_shortcut():
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     if not pythonw.exists():
         pythonw = Path(sys.executable)
-    script = HERE / "config_gui.py"
+    script = HERE / "furscraper.py"
     dd = desktop_dir()
     dd.mkdir(parents=True, exist_ok=True)
     shortcut = dd / "FurScraper.lnk"
@@ -104,7 +108,7 @@ def main():
 
     if not install_requirements():
         sys.exit(1)
-    if not check_tkinter():
+    if not check_imports():
         sys.exit(1)
     if not make_shortcut():
         sys.exit(1)

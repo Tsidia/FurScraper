@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FurScraper</title>
+<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="boot" class="boot">Loading…</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <img class="mark" src="/static/icon.svg" alt="">
+      <span>FurScraper</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="dashboard">Dashboard</button>
+      <button class="tab" data-view="sources">Sources</button>
+      <button class="tab" data-view="gallery">Gallery</button>
+      <button class="tab" data-view="settings">Settings</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="pill" id="sched-pill">…</span>
+      <button class="btn ghost" id="quit-btn" title="Close FurScraper">Quit</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------- Dashboard ---------- -->
+    <section class="view active" id="view-dashboard">
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-value" id="stat-files">–</div>
+          <div class="stat-label">files archived</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-sources">–</div>
+          <div class="stat-label">sources enabled</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-interval">–</div>
+          <div class="stat-label">run interval</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-last">–</div>
+          <div class="stat-label">last run</div>
+        </div>
+      </div>
+
+      <div class="card run-card">
+        <div class="run-head">
+          <div>
+            <h2>Run now</h2>
+            <p class="muted" id="run-status">Idle.</p>
+          </div>
+          <button class="btn primary big" id="run-btn">Run now</button>
+        </div>
+        <div class="progress" id="run-progress" hidden><div class="bar"></div></div>
+        <div id="run-result"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Activity log</h2>
+          <div class="row-actions">
+            <label class="check tight">
+              <input type="checkbox" id="log-follow" checked><span>Follow</span>
+            </label>
+            <button class="btn ghost" id="open-appdata">Open data folder</button>
+          </div>
+        </div>
+        <pre class="log" id="log"></pre>
+      </div>
+    </section>
+
+    <!-- ---------- Sources ---------- -->
+    <section class="view" id="view-sources">
+      <p class="lede">Each source is checked on every run. Turn off what you do not want.</p>
+
+      <div class="card source" data-module="e621">
+        <div class="card-head">
+          <div>
+            <h2>e621</h2>
+            <p class="muted">Tag searches against the official API.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="e621-enabled"><span></span></label>
+        </div>
+        <div class="card-body">
+          <div class="field-row">
+            <label class="field">
+              <span>Username</span>
+              <input type="text" id="e621-username" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="field">
+              <span>API key</span>
+              <input type="password" id="e621-apikey" autocomplete="off">
+            </label>
+          </div>
+          <p class="hint">Generate a key at e621.net → Account → Manage API Access. Explicit posts have no download URL without one.</p>
+          <label class="field">
+            <span>Tag searches, one per line</span>
+            <textarea id="e621-searches" rows="6" spellcheck="false" placeholder="canine rating:safe&#10;dragon -comic"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="card source" data-module="fa_artists">
+        <div class="card-head">
+          <div>
+            <h2>FA Artists</h2>
+            <p class="muted">Gallery <em>and</em> scraps for each artist, treated as one body of work.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="fa_artists-enabled"><span></span></label>
+        </div>
+        <div class="card-body">
+          <label class="field">
+            <span>FurAffinity usernames, one per line</span>
+            <textarea id="fa_artists-list" rows="6" spellcheck="false"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="card source" data-module="fa_watchlist">
+        <div class="card-head">
+          <div>
+            <h2>FA Watchlist</h2>
+            <p class="muted">New submissions from everyone you follow.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="fa_watchlist-enabled"><span></span></label>
+        </div>
+      </div>
+
+      <div class="card source" data-module="fa_search">
+        <div class="card-head">
+          <div>
+            <h2>FA Search</h2>
+            <p class="muted">Keyword searches, newest first. Noisier than e621 tags.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="fa_search-enabled"><span></span></label>
+        </div>
+        <div class="card-body">
+          <label class="field">
+            <span>Queries, one per line</span>
+            <textarea id="fa_search-list" rows="5" spellcheck="false"></textarea>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- Gallery ---------- -->
+    <section class="view" id="view-gallery">
+      <div class="gallery-bar">
+        <div class="segmented" id="gal-filter">
+          <button class="seg active" data-source="all">All</button>
+          <button class="seg" data-source="e621">e621</button>
+          <button class="seg" data-source="fa">FurAffinity</button>
+        </div>
+        <span class="muted" id="gal-count"></span>
+        <button class="btn ghost" id="open-output">Open folder</button>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="pager" id="pager"></div>
+      <div class="empty" id="gal-empty" hidden>
+        <h3>Nothing here yet</h3>
+        <p class="muted">Enable a source and hit Run now. Downloads show up here.</p>
+      </div>
+    </section>
+
+    <!-- ---------- Settings ---------- -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <div class="card-head"><h2>FurAffinity access</h2></div>
+        <div class="card-body">
+          <div class="callout warn">
+            <strong>Your FA account must use the Classic theme.</strong>
+            The Modern layout cannot be read at all. On FA go to Settings → Site
+            Preferences and choose Classic.
+          </div>
+          <p class="hint">
+            Log into furaffinity.net, press F12, open Application → Cookies →
+            www.furaffinity.net, and copy the <em>values</em> of the cookies named
+            <code>a</code> and <code>b</code>. Every FA source needs these; your
+            session is what authenticates each request.
+          </p>
+          <div class="field-row">
+            <label class="field">
+              <span>Cookie <code>a</code></span>
+              <input type="password" id="cookie-a" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Cookie <code>b</code></span>
+              <input type="password" id="cookie-b" autocomplete="off">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Schedule and output</h2></div>
+        <div class="card-body">
+          <div class="field-row">
+            <label class="field narrow">
+              <span>Run every (minutes)</span>
+              <input type="number" id="interval" min="1" max="10080">
+            </label>
+            <label class="field">
+              <span>Output folder</span>
+              <input type="text" id="output-dir" spellcheck="false">
+            </label>
+          </div>
+          <p class="hint" id="sched-detail">The scheduled task only runs while you are logged in.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Blacklist</h2></div>
+        <div class="card-body">
+          <label class="field">
+            <span>Tags and keywords, one per line. Case-insensitive, applied to every source.</span>
+            <textarea id="blacklist" rows="6" spellcheck="false"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Opening FurScraper again</h2></div>
+        <div class="card-body">
+          <p class="muted">
+            This address does not change. Bookmark it and FurScraper opens
+            straight from your browser whenever it is running.
+          </p>
+          <div class="url-row">
+            <input type="text" id="app-url" readonly spellcheck="false">
+            <button class="btn" id="copy-url">Copy</button>
+          </div>
+          <div class="callout warn" id="port-warning" hidden></div>
+
+          <label class="check block">
+            <input type="checkbox" id="keep-ui">
+            <span>Keep the interface available from log-in, like the scraper</span>
+          </label>
+          <p class="hint" id="keep-ui-hint"></p>
+
+          <div class="field-row">
+            <label class="field narrow">
+              <span>Interface port</span>
+              <input type="number" id="ui-port" min="1024" max="49151">
+            </label>
+          </div>
+          <p class="hint">
+            Changing the port takes effect next launch, and changes the address
+            above, so re-bookmark it if you do. It is only ever reachable from
+            this computer.
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Where things live</h2></div>
+        <div class="card-body">
+          <dl class="paths">
+            <dt>Config</dt><dd id="path-config">–</dd>
+            <dt>Log</dt><dd id="path-log">–</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="savebar" id="savebar">
+    <span id="save-msg"></span>
+    <div class="savebar-actions">
+      <button class="btn ghost" id="revert-btn">Discard changes</button>
+      <button class="btn primary" id="save-btn">Save &amp; schedule</button>
+    </div>
+  </footer>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lb-close" id="lb-close" title="Close (Esc)">&times;</button>
+  <button class="lb-nav prev" id="lb-prev" title="Previous (←)">&#10094;</button>
+  <button class="lb-nav next" id="lb-next" title="Next (→)">&#10095;</button>
+  <div class="lb-stage" id="lb-stage"></div>
+  <div class="lb-info" id="lb-info"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>window.__TOKEN__ = "__TOKEN_VALUE__";</script>
+<script src="/static/app.js"></script>
+</body>
+</html>
