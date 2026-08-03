@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import logging
@@ -59,6 +60,30 @@ def run_all(cfg, logger, progress=None):
     return total_new, total_errs, mod_failures
 
 
+def _child_env():
+    """The environment for a copy of ourselves, minus PyInstaller's private
+    variables.
+
+    A packaged build unpacks itself into a temp folder and tells its own
+    subprocesses where that folder is through the environment. Inherited by a
+    second launch, those variables make it skip unpacking and run out of the
+    *first* launch's folder instead. The first launch then cannot delete that
+    folder when it exits (hence Windows' "failed to remove directory _MEIxxxx"
+    complaints) and lingers, waiting, for as long as the second is alive.
+
+    That is fatal here, because the interface is meant to outlive the run that
+    started it: --run would never exit, and the scheduled task skips a new run
+    while an old one is still going, so scraping would stop after the first
+    one. Stripping the variables makes the child unpack its own copy and the
+    two processes independent.
+    """
+    env = dict(os.environ)
+    for name in list(env):
+        if name.startswith("_PYI") or name == "_MEIPASS2":
+            del env[name]
+    return env
+
+
 def _ensure_ui_running(cfg, logger):
     """Bring the interface back if it died, so the bookmark keeps working.
 
@@ -81,7 +106,9 @@ def _ensure_ui_running(cfg, logger):
         flags = 0
         for name in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP", "CREATE_NO_WINDOW"):
             flags |= getattr(subprocess, name, 0)
-        subprocess.Popen(cmd, creationflags=flags, close_fds=True)
+        subprocess.Popen(
+            cmd, creationflags=flags, close_fds=True, env=_child_env()
+        )
         logger.info("interface was not running; started it")
     except Exception as e:
         logger.warning(f"could not restart the interface: {e}")

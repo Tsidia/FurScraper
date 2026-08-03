@@ -33,24 +33,60 @@ jobs:
         run: pyinstaller --clean --noconfirm furscraper.spec
 
       - name: Smoke-test the executable
-        # The exe is windowed, so it cannot report to stdout. Confirm it at
-        # least starts, loads config and reaches the scraper path without
-        # crashing: --run against a config with no modules enabled exits 0
-        # quickly and touches no network.
+        # The exe is windowed, so it cannot report to stdout. These checks
+        # confirm it starts, loads config, completes a scrape, and can serve
+        # the interface, which is also what catches a bundled dependency that
+        # did not make it into the build.
+        #
+        # Everything runs against a throwaway APPDATA holding a config we
+        # write, so nothing depends on runner defaults. The config leaves the
+        # interface enabled so --run takes its watchdog branch and starts one:
+        # that branch spawns a copy of the exe that outlives the run, and
+        # getting it wrong once left --run hanging forever, which would stop
+        # scheduled scraping after the first run. Waiting on the interface to
+        # answer also proves the packaged build can serve, which is what
+        # catches a dependency that did not make it into the bundle.
         run: |
           if (-not (Test-Path dist\FurScraper.exe)) { throw "exe was not produced" }
           $size = (Get-Item dist\FurScraper.exe).Length
           Write-Host "Built dist\FurScraper.exe ($([math]::Round($size/1MB,1)) MB)"
           if ($size -lt 5MB) { throw "exe is suspiciously small: $size bytes" }
+
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP 'smoke'
+          $appdir = Join-Path $env:APPDATA 'FurScraper'
+          New-Item -ItemType Directory -Force $appdir | Out-Null
+          $cfg = @{
+            output_dir       = (Join-Path $env:RUNNER_TEMP 'out')
+            ui_port          = 47899
+            keep_ui_running  = $true
+            lan_enabled      = $false
+            modules          = @{}
+          } | ConvertTo-Json
+          [System.IO.File]::WriteAllText((Join-Path $appdir 'config.json'), $cfg)
+
           # Never -Wait unbounded: a failure path could raise a modal dialog
           # that nothing on a headless runner will ever dismiss.
           $p = Start-Process dist\FurScraper.exe -ArgumentList '--run' -PassThru
           if (-not $p.WaitForExit(120000)) {
             $p.Kill()
-            throw "FurScraper.exe --run did not exit within 120s (stuck, possibly on a dialog)"
+            throw "FurScraper.exe --run did not exit within 120s (stuck: a dialog, or an interface child holding it open)"
           }
-          Write-Host "exit code: $($p.ExitCode)"
+          Write-Host "--run exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "FurScraper.exe --run exited $($p.ExitCode)" }
+
+          try {
+            $answered = $false
+            foreach ($i in 1..60) {
+              try {
+                $r = Invoke-WebRequest 'http://127.0.0.1:47899/api/ping' -TimeoutSec 3 -UseBasicParsing
+                if ($r.Content -match 'FurScraper') { $answered = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $answered) { throw "the interface never answered on 127.0.0.1:47899" }
+            Write-Host "interface answered /api/ping"
+          } finally {
+            Get-Process FurScraper -ErrorAction SilentlyContinue | Stop-Process -Force
+          }
 
       - uses: actions/upload-artifact@v4
         with:
